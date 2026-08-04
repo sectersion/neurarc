@@ -44,10 +44,11 @@ others are optional with the noted defaults.
 | `io_map` | object | — | Input/output port declarations (see §2.5). |
 | `tensors` | object | **R** | Descriptions of every tensor in the binary blob (see §3). |
 
-### 2.2 `neuron_params` (Default / Fallback)
+### 2.2 `neuron_params`
 
-Used when all populations share the same parameters, or when `populations` is
-omitted. Parameters use **SI-derived units** stored as plain floats.
+Default neuron parameters. Used when all populations share the same parameters,
+or when `populations` is omitted. Parameters use **SI-derived units** stored as
+plain floats.
 
 | Field | Unit suffix | Default | Description |
 |-------|-------------|---------|-------------|
@@ -69,14 +70,6 @@ A JSON object keyed by population name. Each value:
 | `v_reset_mv` | float | — | Reset voltage. |
 | `v_rest_mv` | float | — | Resting voltage. |
 
-**Example:**
-```json
-"populations": {
-  "sensory": { "n_neurons": 80, "global_offset": 0, "v_thresh_mv": -45.0 },
-  "motor":   { "n_neurons": 50, "global_offset": 80 }
-}
-```
-
 ### 2.4 `projections`
 
 A JSON object keyed by projection name. Each value:
@@ -94,7 +87,7 @@ ones.
 
 ### 2.5 `io_map`
 
-Named I/O ports for external interaction. Structure:
+Named I/O ports for external interaction.
 
 ```json
 "io_map": {
@@ -168,89 +161,19 @@ Neuron *i* in population *P* has global index `P.global_offset + i`.
 
 ### 3.3 Supported dtypes
 
-| String | C type | Bytes | Notes |
-|--------|--------|-------|-------|
-| `"u8"` | `uint8_t` | 1 | Flags, booleans, small enums |
-| `"u32"` | `uint32_t` | 4 | Neuron indices, row pointers |
-| `"f16"` | `float16` | 2 | Weights (IEEE 754 half-precision) |
-| `"f32"` | `float32` | 4 | Weights when higher precision is needed |
+| String | Bytes | Description |
+|--------|-------|-------------|
+| `"u8"` | 1 | Unsigned 8-bit integer |
+| `"u32"` | 4 | Unsigned 32-bit integer |
+| `"f16"` | 2 | IEEE 754 half-precision float |
+| `"f32"` | 4 | IEEE 754 single-precision float |
 
 All values are stored in **little-endian** byte order.
 
-### 3.4 Additional / Future Tensors
+### 3.4 Additional Tensors
 
 Implementations may include extra tensors (e.g. `synapse_delay`, `synapse_type`)
 by adding entries to `tensors`. Unknown keys should be ignored by readers.
-
----
-
-## 4. Walkthrough — Reading an ARC File
-
-```python
-import json, struct, numpy as np
-
-with open("network.arc", "rb") as f:
-    magic = f.read(4)                         # b"ARC1"
-    header_len = struct.unpack("<Q", f.read(8))[0]
-    header = json.loads(f.read(header_len))
-    blob = f.read()
-
-def read_tensor(name):
-    t = header["tensors"][name]
-    dt = {"u8": np.uint8, "u32": np.uint32,
-          "f16": np.float16, "f32": np.float32}[t["dtype"]]
-    return np.frombuffer(blob, dtype=dt,
-                         count=t["length"], offset=t["offset"])
-
-src    = read_tensor("synapse_src")     # uint32, [synapse_count]
-dst    = read_tensor("synapse_dst")     # uint32, [synapse_count]
-weight = read_tensor("synapse_weight")  # float16, [synapse_count]
-```
-
----
-
-## 5. Walkthrough — Writing an ARC File
-
-```python
-import json, struct, numpy as np
-
-# ... build src, dst, weight arrays ...
-src    = np.asarray(src, dtype=np.uint32)
-dst    = np.asarray(dst, dtype=np.uint32)
-weight = np.asarray(weight, dtype=np.float16)
-n = len(src)
-
-offsets = {}
-off = 0
-for name, arr in [("synapse_src", src), ("synapse_dst", dst),
-                  ("synapse_weight", weight)]:
-    offsets[name] = {"offset": off, "length": len(arr),
-                     "dtype": {np.uint8: "u8", np.uint32: "u32",
-                               np.float16: "f16", np.float32: "f32"}[arr.dtype]}
-    off += arr.nbytes
-
-header = {
-    "format_version": 1,
-    "neuron_count": neuron_count,
-    "neuron_model": "LIF",
-    "synapse_count": n,
-    "connectivity_format": "edge_list",
-    "populations": { ... },
-    "projections": { ... },
-    "io_map": { ... },
-    "tensors": offsets,
-}
-
-header_bytes = json.dumps(header, separators=(",", ":")).encode("utf-8")
-
-with open("network.arc", "wb") as f:
-    f.write(b"ARC1")
-    f.write(struct.pack("<Q", len(header_bytes)))
-    f.write(header_bytes)
-    f.write(src.tobytes())
-    f.write(dst.tobytes())
-    f.write(weight.tobytes())
-```
 
 ---
 

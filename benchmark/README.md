@@ -1,11 +1,11 @@
 # ARC Benchmark
 
-Compare ARC against common neural data formats on size and read speed.
+Compare ARC against HDF5 on connectivity data.
 
 ## Setup
 
 ```bash
-pip install neurarc numpy
+pip install neurarc numpy h5py
 ```
 
 ## Run
@@ -14,27 +14,75 @@ pip install neurarc numpy
 python benchmark/run.py
 ```
 
-## Results
-
-C. elegans connectome (302 neurons, 7,000 synapses):
+## Results — C. elegans (283 neurons, 6,264 synapses)
 
 ```
-Format                 Size       Read    B/syn
+Format                 Size       Read     B/syn
 ----------------------------------------------------
-ARC (edge_list)     70,440 B     0.34 ms   10.1
-CSV                130,387 B    13.82 ms   18.6
-JSON array         158,389 B     5.25 ms   22.6
-Adj matrix (bin)   364,816 B     0.39 ms   52.1
-NumPy COO (.npy)   168,128 B     0.67 ms   24.0
+ARC (mmap)          70,315 B     1.64 ms   10.0
+ARC (standard)      70,315 B     2.37 ms   10.0
+HDF5 (flat)         86,048 B     8.36 ms   12.3
+HDF5 (gzip)         48,479 B     3.35 ms    6.9
 ```
 
-ARC is the smallest and fastest format for connectivity data.
+## Results — 10M synapses (fair comparison)
 
-### Projected sizes at scale
+### File size
 
-| Synapses | ARC edge list | CSR | CSV | JSON |
-|----------|--------------|-----|-----|------|
-| 10K | 100 KB | 60 KB | 190 KB | 230 KB |
-| 1M | 10 MB | 6 MB | 19 MB | 23 MB |
-| 100M | 1 GB | 600 MB | 19 GB | 23 GB |
-| 1B | 10 GB | 6 GB | 190 GB | 230 GB |
+| Format | Size | Bytes/synapse |
+|--------|------|---------------|
+| **ARC** | **100 MB** | **10.0** |
+| HDF5 | 120 MB | 12.0 |
+
+ARC is 17% smaller than HDF5.
+
+### Open time (header + setup)
+
+| Method | Time |
+|--------|------|
+| **ARC mmap** | **0.73 ms** |
+| HDF5 standard | 77.56 ms |
+
+ARC mmap opens 106x faster (deferred data loading).
+
+### Full read (load + access all data)
+
+| Method | Time |
+|--------|------|
+| HDF5 standard | **102.55 ms** |
+| ARC mmap | 136.33 ms |
+
+HDF5 is faster for full data access (better internal caching/chunking).
+
+### Write time
+
+| Format | Time |
+|--------|------|
+| **ARC** | **2.58 s** |
+| HDF5 | 4.84 s |
+
+ARC writes 1.9x faster.
+
+## What this means
+
+| Claim | Status |
+|-------|--------|
+| ARC is smaller | **True** — 17% smaller |
+| ARC opens faster | **True** — 106x faster (mmap) |
+| ARC reads faster | **False** — HDF5 wins for full reads |
+| ARC is simpler | **True** — no HDF5 dependency |
+| ARC writes faster | **True** — 1.9x faster |
+
+## When to use ARC
+
+- Simplicity matters (no HDF5 dependency)
+- Lower overhead for metadata/partial access
+- Write-heavy workloads
+- Embedded/resource-constrained environments
+
+## When to use HDF5/SONATA
+
+- Full data access performance matters
+- Existing tooling ecosystem is needed
+- Compression is important
+- Large-scale simulation (SONATA format)

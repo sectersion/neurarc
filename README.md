@@ -1,39 +1,27 @@
 # neurarc
 
-The fastest binary format for neural connectome data.
+A compact binary format for neural connectome data.
 
 ## What is ARC?
 
-**ARC** (version 1) is a compact binary format for storing neural connectivity data:
+**ARC** (version 1) is a binary format for storing neural connectivity data:
 
 - **Neuron populations** — named groups with counts, offsets, and model parameters
 - **Synaptic connectivity** — source/destination indices and weights
 - **Neuron model parameters** — membrane time constants, thresholds, reset voltages
 - **I/O port mappings** — named input/output ports for external interaction
 
-## Performance
+## How does it compare to HDF5?
 
-ARC is the smallest and fastest format for connectivity data.
+| Claim | Status |
+|-------|--------|
+| ARC is smaller | **True** — 17% smaller than HDF5 |
+| ARC opens faster | **True** — 106x faster with mmap |
+| ARC reads faster | **False** — HDF5 wins for full data access |
+| ARC is simpler | **True** — no HDF5 dependency |
+| ARC writes faster | **True** — 1.9x faster |
 
-```
-Format                 Size       Read    B/syn
-----------------------------------------------------
-ARC (edge_list)     70,440 B     0.34 ms   10.1
-CSV                130,387 B    13.82 ms   18.6
-JSON array         158,389 B     5.25 ms   22.6
-Adj matrix (bin)   364,816 B     0.39 ms   52.1
-NumPy COO (.npy)   168,128 B     0.67 ms   24.0
-```
-
-Benchmarked on C. elegans (302 neurons, 7,000 synapses). See [benchmark/](benchmark/) for code and projected sizes at scale.
-
-| Metric | ARC | CSV | JSON |
-|--------|-----|-----|------|
-| Size | 10 B/synapse | 19 B/synapse | 23 B/synapse |
-| Read | 0.34 ms | 13.8 ms | 5.3 ms |
-| Format overhead | 12 bytes | per-line | per-element |
-
-At 100M synapses: ARC = **1 GB**, CSV = **19 GB**, JSON = **23 GB**.
+**ARC's niche:** simpler, smaller, lower overhead for metadata and partial access. Not a replacement for HDF5 at scale — a lighter alternative for specific use cases.
 
 ## Format
 
@@ -56,6 +44,22 @@ See [ARC_SPEC.md](ARC_SPEC.md).
 |----------|---------|---------|
 | Python | [neurarc-py](https://github.com/sectersion/neurarc-py) | `pip install neurarc` |
 | Rust | [neurarc-rs](https://github.com/sectersion/neurarc-rs) | `cargo add neurarc` |
+
+## Benchmark
+
+See [benchmark/](benchmark/) for code and detailed results.
+
+```
+10M synapses:
+  ARC mmap open:     0.73 ms
+  HDF5 open:        77.56 ms
+
+  ARC full read:   136.33 ms
+  HDF5 full read:  102.55 ms
+
+  ARC write:         2.58 s
+  HDF5 write:        4.84 s
+```
 
 ## License
 

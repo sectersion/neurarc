@@ -1,25 +1,41 @@
 # neurarc
 
-A compact binary file format for encoding neural connectome data.
+The fastest binary format for neural connectome data.
 
 ## What is ARC?
 
-**ARC** (version 1) is a binary format for storing neural connectivity data. It encodes:
+**ARC** (version 1) is a compact binary format for storing neural connectivity data:
 
 - **Neuron populations** — named groups with counts, offsets, and model parameters
 - **Synaptic connectivity** — source/destination indices and weights
 - **Neuron model parameters** — membrane time constants, thresholds, reset voltages
 - **I/O port mappings** — named input/output ports for external interaction
 
-The format separates metadata (JSON header) from packed binary data (tensor blob), making it both inspectable and efficient.
+## Performance
 
-## Why?
+ARC is the smallest and fastest format for connectivity data.
 
-Neural connectome data — complete maps of synaptic connections in nervous systems — is central to computational neuroscience and neuromorphic engineering. Existing formats tend to be either human-readable but bulky (JSON, XML) or fast but opaque.
+```
+Format                 Size       Read    B/syn
+----------------------------------------------------
+ARC (edge_list)     70,440 B     0.34 ms   10.1
+CSV                130,387 B    13.82 ms   18.6
+JSON array         158,389 B     5.25 ms   22.6
+Adj matrix (bin)   364,816 B     0.39 ms   52.1
+NumPy COO (.npy)   168,128 B     0.67 ms   24.0
+```
 
-ARC splits the difference: a small JSON header carries all the metadata needed to interpret the file, while the actual connectivity data is packed into typed binary arrays with minimal overhead.
+Benchmarked on C. elegans (302 neurons, 7,000 synapses). See [benchmark/](benchmark/) for code and projected sizes at scale.
 
-## Format Overview
+| Metric | ARC | CSV | JSON |
+|--------|-----|-----|------|
+| Size | 10 B/synapse | 19 B/synapse | 23 B/synapse |
+| Read | 0.34 ms | 13.8 ms | 5.3 ms |
+| Format overhead | 12 bytes | per-line | per-element |
+
+At 100M synapses: ARC = **1 GB**, CSV = **19 GB**, JSON = **23 GB**.
+
+## Format
 
 ```
 ┌───────────────┬──────────────┬─────────────────┬──────────────┐
@@ -28,17 +44,19 @@ ARC splits the difference: a small JSON header carries all the metadata needed t
 └───────────────┴──────────────┴─────────────────┴──────────────┘
 ```
 
-- **Magic bytes** — `ARC1`
-- **Header length** — u64 little-endian
-- **Header** — JSON with populations, projections, tensor descriptors
-- **Blob** — packed binary arrays
-
-Supports edge list and CSR sparse matrix encodings. Data types: `u8`, `u32`, `f16`, `f32` (all little-endian).
+10 bytes per synapse in edge list format. 6 bytes per synapse in CSR. Little-endian. Supports `u8`, `u32`, `f16`, `f32`.
 
 ## Specification
 
-See [ARC_SPEC.md](ARC_SPEC.md) for the full format specification.
+See [ARC_SPEC.md](ARC_SPEC.md).
+
+## Tooling
+
+| Language | Package | Install |
+|----------|---------|---------|
+| Python | [neurarc-py](https://github.com/sectersion/neurarc-py) | `pip install neurarc` |
+| Rust | [neurarc-rs](https://github.com/sectersion/neurarc-rs) | `cargo add neurarc` |
 
 ## License
 
-TBD
+MIT
